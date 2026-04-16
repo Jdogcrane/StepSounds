@@ -55,6 +55,58 @@ public interface StepSoundsConfig extends Config
 	}
 
 	@ConfigSection(
+		name = "Categorization Data",
+		description = "Stored IDs for ground types",
+		position = 10
+	)
+	String categorizationData = "categorizationData";
+
+	@ConfigItem(
+		keyName = "stoneIds",
+		name = "Stone IDs",
+		description = "Comma separated list of stone IDs",
+		position = 1,
+		section = categorizationData
+	)
+	default String stoneIds() { return ""; }
+
+	@ConfigItem(
+		keyName = "grassIds",
+		name = "Grass IDs",
+		description = "Comma separated list of grass IDs",
+		position = 2,
+		section = categorizationData
+	)
+	default String grassIds() { return ""; }
+
+	@ConfigItem(
+		keyName = "dirtIds",
+		name = "Dirt IDs",
+		description = "Comma separated list of dirt IDs",
+		position = 3,
+		section = categorizationData
+	)
+	default String dirtIds() { return ""; }
+
+	@ConfigItem(
+		keyName = "woodIds",
+		name = "Wood IDs",
+		description = "Comma separated list of wood IDs",
+		position = 4,
+		section = categorizationData
+	)
+	default String woodIds() { return ""; }
+
+	@ConfigItem(
+		keyName = "fabricIds",
+		name = "Fabric IDs",
+		description = "Comma separated list of fabric IDs",
+		position = 5,
+		section = categorizationData
+	)
+	default String fabricIds() { return ""; }
+
+	@ConfigSection(
 		name = "Debug Settings",
 		description = "Debug and development settings",
 		position = 99
@@ -69,6 +121,18 @@ public interface StepSoundsConfig extends Config
 		section = debugSettings
 	)
 	default boolean showDebugMessages()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "categorizationMode",
+		name = "Categorization Mode",
+		description = "Enable Alt+Click categorization tool",
+		position = 2,
+		section = debugSettings
+	)
+	default boolean categorizationMode()
 	{
 		return false;
 	}
