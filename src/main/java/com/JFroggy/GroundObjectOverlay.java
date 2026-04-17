@@ -8,7 +8,6 @@ import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.GroundObject;
 import net.runelite.api.Perspective;
-import net.runelite.api.SceneTilePaint;
 import net.runelite.api.Tile;
 import net.runelite.api.coords.LocalPoint;
 import net.runelite.client.ui.overlay.Overlay;
@@ -62,27 +61,44 @@ public class GroundObjectOverlay extends Overlay
 		Polygon poly = Perspective.getCanvasTilePoly(client, lp);
 		if (poly == null) return;
 
-		boolean goHighlighted = false;
+		// 0. Raw RGB Highlight (Debug mode) - Toggled on for all tiles if checked
+		if (plugin.isShowAllTilesRgbEnabled())
+		{
+			Integer tileRgb = plugin.getTileRgb(tile);
+			if (tileRgb != null)
+			{
+				graphics.setColor(new Color(tileRgb));
+				graphics.fillPolygon(poly);
+				return; // If debug view is on, it overrides everything
+			}
+		}
+
+		GroundObject groundObject = tile.getGroundObject();
+		boolean categorizedGO = false;
 
 		// 1. GroundObject Highlight (Priority 1)
-		if (config.groundObjectMapping())
+		if (groundObject != null)
 		{
-			GroundObject groundObject = tile.getGroundObject();
-			if (groundObject != null)
+			for (PaletteEntry entry : plugin.getPaletteEntries())
 			{
-				for (PaletteEntry entry : plugin.getPaletteEntries())
+				if (entry.getIds().contains(groundObject.getId()))
 				{
-					if (entry.getIds().contains(groundObject.getId()))
+					categorizedGO = true;
+					if (config.groundObjectMapping() && entry.isVisible())
 					{
-						if (entry.isVisible())
-						{
-							graphics.setColor(entry.getColor());
-							graphics.fillPolygon(poly);
-							goHighlighted = true;
-						}
-						break;
+						graphics.setColor(entry.getColor());
+						graphics.fillPolygon(poly);
 					}
+					break;
 				}
+			}
+
+			// 4. Uncategorized Highlight (Alt Toggle) - Specifically for GroundObjects
+			if (!categorizedGO && plugin.isAltPressed())
+			{
+				graphics.setColor(config.uncategorizedColor());
+				graphics.fillPolygon(poly);
+				return; 
 			}
 		}
 
@@ -101,13 +117,9 @@ public class GroundObjectOverlay extends Overlay
 						{
 							if (entry.isVisible())
 							{
-								// If both are on, draw spectrum with transparency if GO is already there,
-								// or just draw it if GO isn't there.
 								Color c = entry.getColor();
-								if (goHighlighted)
+								if (categorizedGO)
 								{
-									// Draw a border or a smaller polygon?
-									// Let's just draw over it with some transparency.
 									graphics.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(), 128));
 								}
 								else
@@ -121,24 +133,6 @@ public class GroundObjectOverlay extends Overlay
 					}
 				}
 			}
-		}
-
-		// 3. Raw RGB Highlight (Debug mode) - No opacity
-		if (!goHighlighted && plugin.isShowAllTilesRgbEnabled())
-		{
-			Integer tileRgb = plugin.getTileRgb(tile);
-			if (tileRgb != null)
-			{
-				graphics.setColor(new Color(tileRgb));
-				graphics.fillPolygon(poly);
-			}
-		}
-
-		// 4. Uncategorized Highlight (Alt Toggle)
-		if (!goHighlighted && plugin.isAltPressed())
-		{
-			graphics.setColor(config.uncategorizedColor());
-			graphics.fillPolygon(poly);
 		}
 	}
 }
