@@ -28,30 +28,57 @@ public interface StepSoundsConfig extends Config
 	@Range(max = 100)
 	default int masterVolume()
 	{
-		return 50;
+		return 20;
 	}
 
 	@ConfigItem(
-		keyName = "enableMomentum",
-		name = "Momentum Based Sounds",
-		description = "Adjust sounds based on movement momentum",
+		keyName = "volumeVariance",
+		name = "Volume Variance",
+		description = "Random volume variation for each step (0-20%)",
 		position = 2,
 		section = audioSettings
 	)
-	default boolean enableMomentum()
+	@Range(max = 20)
+	default int volumeVariance()
 	{
-		return true;
+		return 10;
 	}
 
 	@ConfigItem(
-		keyName = "variance",
-		name = "Volume Variance",
-		description = "Random volume variation for each step (0-20%)",
+		keyName = "walkPitch",
+		name = "Walk Pitch",
+		description = "Base pitch for walking sounds",
 		position = 3,
 		section = audioSettings
 	)
+	@Range(min = 50, max = 150) // Representing 0.5 to 1.5 as 50 to 150
+	default int walkPitch()
+	{
+		return 100; // Default to 1.0f
+	}
+
+	@ConfigItem(
+		keyName = "runPitchIncrease",
+		name = "Run Pitch Increase",
+		description = "How much higher the pitch is when running (0-50%)",
+		position = 4,
+		section = audioSettings
+	)
+	@Range(max = 50)
+	default int runPitchIncrease()
+	{
+		return 45; // Default to 10% increase
+	}
+
+	@ConfigItem(
+		keyName = "pitchVariance",
+		name = "Pitch Variance",
+		description = "Random pitch variation for each step (0-20%)",
+		position = 5,
+		section = audioSettings
+	)
 	@Range(max = 20)
-	default int variance()
+	default int pitchVariance()
 	{
 		return 10;
 	}

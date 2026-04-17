@@ -117,7 +117,7 @@ public class StepSoundsMain extends Plugin implements KeyListener, MouseListener
 		palettePanel = new PalettePanel(this);
 		loadPalette();
 		
-		palettePanel.updateToggles(config.groundObjectMapping(), config.tileColorMapping());
+		palettePanel.updateToggles(config.groundObjectMapping(), config.tileColorMapping(), config.showDebugMessages(), config.categorizationMode());
 
 		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "/icon.png");
 		navButton = NavigationButton.builder()
@@ -144,8 +144,16 @@ public class StepSoundsMain extends Plugin implements KeyListener, MouseListener
 
 	public void updateMappingToggles()
 	{
-		configManager.setConfiguration("stepsounds", "groundObjectMapping", palettePanel.isGroundObjectMappingEnabled());
-		configManager.setConfiguration("stepsounds", "tileColorMapping", palettePanel.isTileColorMappingEnabled());
+		// Force re-reading current state to ensure accuracy
+		boolean newGroundObjectMapping = palettePanel.isGroundObjectMappingEnabled();
+		boolean newTileColorMapping = palettePanel.isTileColorMappingEnabled();
+		boolean newShowDebugMessages = palettePanel.isShowDebugMessagesEnabled();
+		boolean newCategorizationMode = palettePanel.isCategorizationModeEnabled();
+
+		configManager.setConfiguration("stepsounds", "groundObjectMapping", newGroundObjectMapping);
+		configManager.setConfiguration("stepsounds", "tileColorMapping", newTileColorMapping);
+		configManager.setConfiguration("stepsounds", "showDebugMessages", newShowDebugMessages);
+		configManager.setConfiguration("stepsounds", "categorizationMode", newCategorizationMode);
 	}
 
 	public String detectCurrentCategory()
@@ -194,6 +202,7 @@ public class StepSoundsMain extends Plugin implements KeyListener, MouseListener
 			Tile tile = tiles[z][x][y];
 			if (tile != null)
 			{
+				// GroundObject sound mapping - purely config-driven
 				if (config.groundObjectMapping() && tile.getGroundObject() != null)
 				{
 					int id = tile.getGroundObject().getId();
@@ -203,6 +212,7 @@ public class StepSoundsMain extends Plugin implements KeyListener, MouseListener
 					}
 				}
 				
+				// Tile RGB sound mapping - purely config-driven
 				if (config.tileColorMapping())
 				{
 					Integer tileRgb = getTileRgb(tile);
@@ -357,13 +367,17 @@ public class StepSoundsMain extends Plugin implements KeyListener, MouseListener
 	public void keyTyped(KeyEvent e) {}
 
 	@Override
-	public void keyPressed(KeyEvent e) {}
+	public void keyPressed(KeyEvent e)
+	{
+		if (e.getKeyCode() == KeyEvent.VK_ALT) altPressed = true;
+		else if (e.getKeyCode() == KeyEvent.VK_SHIFT) shiftPressed = true;
+	}
 
 	@Override
 	public void keyReleased(KeyEvent e)
 	{
-		if (e.getKeyCode() == KeyEvent.VK_ALT) altPressed = !altPressed;
-		else if (e.getKeyCode() == KeyEvent.VK_SHIFT) shiftPressed = !shiftPressed;
+		if (e.getKeyCode() == KeyEvent.VK_ALT) altPressed = false;
+		else if (e.getKeyCode() == KeyEvent.VK_SHIFT) shiftPressed = false;
 	}
 
 	@Override
@@ -537,33 +551,34 @@ public class StepSoundsMain extends Plugin implements KeyListener, MouseListener
 
 	private void handleMovement(int distance, WorldPoint location)
 	{
-		if (distance > 1) runTicks = Math.min(runTicks + 2, 20);
-		else runTicks = Math.min(runTicks + 1, 10);
-		float momentum = config.enableMomentum() ? (float)runTicks / 20f : 0f;
-		float pitch = 0.9f + (momentum * 0.25f);
+		boolean isRunning = distance > 1;
+		float basePitch = (float)config.walkPitch() / 100f;
+		float runIncrease = (float)config.runPitchIncrease() / 100f;
+		float pitch = isRunning ? (basePitch + runIncrease) : basePitch;
 		float baseVolume = (config.masterVolume() / 100f);
-		float volume = baseVolume * (0.8f + (momentum * 0.2f));
 
-		lastFinalVolume = volume;
+		lastFinalVolume = baseVolume;
 		lastPitch = pitch;
 
-		if (distance > 1)
+		if (isRunning)
 		{
 			audioManager.playStepSoundDelayed(lastFinalVolume, pitch, 0);
 			audioManager.playStepSoundDelayed(lastFinalVolume, pitch, 300);
 		}
 		else
 		{
-			//single for walk. no need for double as the back footstep isn't as loud
 			audioManager.playStepSoundDelayed(lastFinalVolume, pitch, 500);
 		}
 	}
 
 	public void sendDebugMessage(String msg)
 	{
-		clientThread.invokeLater(() -> {
-			client.addChatMessage(ChatMessageType.CONSOLE, "", "[StepSounds] " + msg, null);
-		});
+		if (config.showDebugMessages())
+		{
+			clientThread.invokeLater(() -> {
+				client.addChatMessage(ChatMessageType.CONSOLE, "", "[StepSounds] " + msg, null);
+			});
+		}
 	}
 
 	@Provides StepSoundsConfig provideConfig(ConfigManager configManager)

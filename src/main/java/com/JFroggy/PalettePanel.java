@@ -32,6 +32,8 @@ public class PalettePanel extends PluginPanel
 	private final JCheckBox groundObjectToggle = new JCheckBox("Ground Object Mapping", true);
 	private final JCheckBox tileColorToggle = new JCheckBox("Tile Color Mapping", true);
 	private final JCheckBox showAllRgbToggle = new JCheckBox("Show all tiles RGB", false);
+	private final JCheckBox showDebugMessagesToggle = new JCheckBox("Show Debug Messages", false);
+	private final JCheckBox categorizationModeToggle = new JCheckBox("Show Debug Overlay", false); // New checkbox for categorization mode
 
 	private final JButton addColorBtn = new JButton("Add Color Mapping");
 
@@ -59,10 +61,14 @@ public class PalettePanel extends PluginPanel
 
 		groundObjectToggle.addActionListener(e -> plugin.updateMappingToggles());
 		tileColorToggle.addActionListener(e -> plugin.updateMappingToggles());
+		showDebugMessagesToggle.addActionListener(e -> plugin.updateMappingToggles());
+		categorizationModeToggle.addActionListener(e -> plugin.updateMappingToggles()); // Add action listener for new toggle
 
 		header.add(groundObjectToggle);
 		header.add(tileColorToggle);
 		header.add(showAllRgbToggle);
+		header.add(showDebugMessagesToggle);
+		header.add(categorizationModeToggle); // Add new checkbox to header
 		header.add(new JSeparator());
 		
 		JPanel buttonGroup = new JPanel(new GridLayout(3, 1, 0, 5));
@@ -221,15 +227,19 @@ public class PalettePanel extends PluginPanel
 		pickingColorPanel = null;
 	}
 
-	public void updateToggles(boolean go, boolean tc)
+	public void updateToggles(boolean go, boolean tc, boolean showDebug, boolean categorizationMode) // Modified to include categorizationMode
 	{
 		groundObjectToggle.setSelected(go);
 		tileColorToggle.setSelected(tc);
+		showDebugMessagesToggle.setSelected(showDebug);
+		categorizationModeToggle.setSelected(categorizationMode); // Set initial state for categorization mode
 	}
 
 	public boolean isGroundObjectMappingEnabled() { return groundObjectToggle.isSelected(); }
 	public boolean isTileColorMappingEnabled() { return tileColorToggle.isSelected(); }
 	public boolean isShowAllTilesRgbEnabled() { return showAllRgbToggle.isSelected(); }
+	public boolean isShowDebugMessagesEnabled() { return showDebugMessagesToggle.isSelected(); }
+	public boolean isCategorizationModeEnabled() { return categorizationModeToggle.isSelected(); } // New getter
 
 	public void save()
 	{

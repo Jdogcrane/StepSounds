@@ -68,8 +68,6 @@ public class AudioManager
 		{
 			for (File dir : categoryDirs)
 			{
-				// Ignore "data" or other internal folders if they exist, 
-				// but user wants stepsounds/<categoryname>
 				loadCategory(dir.getName().toLowerCase(), dir);
 			}
 		}
@@ -154,49 +152,33 @@ public class AudioManager
 
 	public void playStepSound(float volume, float pitch)
 	{
-		// Category detection must happen on client thread
 		clientThread.invokeLater(() -> {
 			String category = pluginProvider.get().detectCurrentCategory();
 			String catKey = (category == null) ? "generic" : category.toLowerCase();
 			
 			List<byte[]> samples = soundCache.get(catKey);
-			boolean usingFallback = false;
 
 			if (samples == null || samples.isEmpty())
 			{
 				samples = soundCache.get("generic");
-				usingFallback = true;
-				if (config.showDebugMessages())
-				{
-					pluginProvider.get().sendDebugMessage("Category '" + catKey + "' not found or empty. Using generic.");
-				}
-			}
-			else if (config.showDebugMessages())
-			{
-				pluginProvider.get().sendDebugMessage("Playing sound for category: " + catKey);
 			}
 
 			if (samples == null || samples.isEmpty() || soundFormat == null)
 			{
-				if (config.showDebugMessages())
-				{
-					pluginProvider.get().sendDebugMessage("FAILED to find any sounds (including generic).");
-				}
 				return;
 			}
 
 			final List<byte[]> finalSamples = samples;
 			final String finalCat = catKey;
 			
-			// Play the sound (this part can be off-thread, but AudioPlayer is usually thread-safe)
 			byte[] originalBytes = finalSamples.get(random.nextInt(finalSamples.size()));
 
 			try {
-				float vVar = config.variance() / 100f;
+				float vVar = config.volumeVariance() / 100f;
 				float finalVolume = volume * (1.0f + (random.nextFloat() * vVar * 2 - vVar));
 				finalVolume = Math.max(0.0001f, Math.min(1.0f, finalVolume));
 
-				float pVar = 0.06f;
+				float pVar = config.pitchVariance() / 100f;
 				float finalPitch = pitch * (1.0f + (random.nextFloat() * pVar * 2 - pVar));
 
 				float gainDb = (float) (Math.log10(finalVolume) * 20.0);
