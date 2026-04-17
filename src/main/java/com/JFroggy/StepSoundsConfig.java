@@ -87,6 +87,18 @@ public interface StepSoundsConfig extends Config
 		return true;
 	}
 
+	@ConfigItem(
+		keyName = "combineMappings",
+		name = "Combine Mapping Systems",
+		description = "Future: Blend sounds if both GroundObject and RGB mappings are present",
+		position = 3,
+		section = mappingSettings
+	)
+	default boolean combineMappings()
+	{
+		return false;
+	}
+
 	@ConfigSection(
 		name = "Debug Settings",
 		description = "Debug and development settings",
