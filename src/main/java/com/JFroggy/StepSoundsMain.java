@@ -1,11 +1,22 @@
 package com.JFroggy;
 
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.google.inject.Provides;
+import java.awt.Color;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.Stack;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import lombok.Getter;
@@ -13,7 +24,6 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.GameTick;
-import net.runelite.api.events.MenuOpened;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.input.KeyManager;
@@ -22,8 +32,10 @@ import net.runelite.client.input.MouseManager;
 import net.runelite.client.input.MouseListener;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.ui.ClientToolbar;
+import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
-import net.runelite.client.util.ColorUtil;
+import net.runelite.client.util.ImageUtil;
 
 @Slf4j
 @PluginDescriptor(
@@ -33,6 +45,8 @@ import net.runelite.client.util.ColorUtil;
 )
 public class StepSoundsMain extends Plugin implements KeyListener, MouseListener
 {
+	private static final String CONFIG_FILE_PATH = "C:/Users/J/Desktop/Files/Games/Minecraft Civ Experiment/CivlabsPublic/StepSounds/GroundObjectsConfig/config.txt";
+
 	@Inject
 	private Client client;
 
@@ -57,6 +71,12 @@ public class StepSoundsMain extends Plugin implements KeyListener, MouseListener
 	@Inject
 	private MouseManager mouseManager;
 
+	@Inject
+	private ClientToolbar clientToolbar;
+
+	@Inject
+	private Gson gson;
+
 	private WorldPoint lastPosition;
 	private int runTicks = 0;
 	private boolean wasMoving = false;
@@ -66,6 +86,11 @@ public class StepSoundsMain extends Plugin implements KeyListener, MouseListener
 	@Getter
 	private boolean altPressed = false;
 
+	private PalettePanel palettePanel;
+	private NavigationButton navButton;
+
+	private final Stack<String> undoStack = new Stack<>();
+
 	@Override
 	protected void startUp() throws Exception
 	{
@@ -73,6 +98,19 @@ public class StepSoundsMain extends Plugin implements KeyListener, MouseListener
 		overlayManager.add(groundObjectOverlay);
 		keyManager.registerKeyListener(this);
 		mouseManager.registerMouseListener(this);
+
+		palettePanel = new PalettePanel(this);
+		loadPalette();
+
+		final BufferedImage icon = ImageUtil.loadImageResource(getClass(), "/icon.png");
+		navButton = NavigationButton.builder()
+			.tooltip("Step Sounds Palette")
+			.icon(icon)
+			.priority(6)
+			.panel(palettePanel)
+			.build();
+
+		clientToolbar.addNavigation(navButton);
 		log.info("Step Sounds started!");
 	}
 
@@ -83,7 +121,139 @@ public class StepSoundsMain extends Plugin implements KeyListener, MouseListener
 		overlayManager.remove(groundObjectOverlay);
 		keyManager.unregisterKeyListener(this);
 		mouseManager.unregisterMouseListener(this);
+		clientToolbar.removeNavigation(navButton);
 		log.info("Step Sounds stopped!");
+	}
+
+	private String serializeCurrentState()
+	{
+		List<PaletteEntryState> state = new ArrayList<>();
+		for (PaletteEntryPanel panel : palettePanel.getEntryPanels())
+		{
+			PaletteEntry entry = panel.getEntry();
+			state.add(new PaletteEntryState(entry.getName(), entry.getColor().getRGB(), entry.isVisible(), new HashSet<>(entry.getIds())));
+		}
+		return gson.toJson(state);
+	}
+
+	private static class PaletteEntryState
+	{
+		String name;
+		int color;
+		boolean visible;
+		Set<Integer> ids;
+
+		PaletteEntryState(String name, int color, boolean visible, Set<Integer> ids)
+		{
+			this.name = name;
+			this.color = color;
+			this.visible = visible;
+			this.ids = ids;
+		}
+	}
+
+	public void savePalette()
+	{
+		savePalette(true);
+	}
+
+	public void savePalette(boolean pushUndo)
+	{
+		StringBuilder sb = new StringBuilder();
+		for (PaletteEntryPanel panel : palettePanel.getEntryPanels())
+		{
+			PaletteEntry entry = panel.getEntry();
+			sb.append("# ").append(entry.getName())
+				.append(";").append(entry.getColor().getRGB())
+				.append(";").append(entry.isVisible())
+				.append("\n");
+
+			sb.append(entry.getName()).append(" IDS:\n");
+			List<Integer> sortedIds = entry.getIds().stream().sorted().collect(Collectors.toList());
+			for (Integer id : sortedIds)
+			{
+				sb.append("    ").append(id).append("\n");
+			}
+			sb.append("\n");
+		}
+
+		try
+		{
+			File file = new File(CONFIG_FILE_PATH);
+			file.getParentFile().mkdirs();
+			Files.write(file.toPath(), sb.toString().getBytes(StandardCharsets.UTF_8));
+		}
+		catch (IOException e)
+		{
+			log.error("Could not save config to " + CONFIG_FILE_PATH, e);
+		}
+	}
+
+	public void undo()
+	{
+		if (undoStack.isEmpty()) return;
+
+		String stateJson = undoStack.pop();
+		List<PaletteEntryState> states = gson.fromJson(stateJson, new TypeToken<List<PaletteEntryState>>(){}.getType());
+
+		palettePanel.clearEntries();
+		for (PaletteEntryState state : states)
+		{
+			palettePanel.addEntry(state.name, new Color(state.color, true));
+			PaletteEntry newEntry = palettePanel.getEntryPanels().get(palettePanel.getEntryPanels().size() - 1).getEntry();
+			newEntry.setVisible(state.visible);
+			newEntry.setIds(state.ids);
+		}
+		savePalette(false);
+	}
+
+	private void loadPalette()
+	{
+		File file = new File(CONFIG_FILE_PATH);
+		if (!file.exists()) return;
+
+		try
+		{
+			List<String> lines = Files.readAllLines(file.toPath(), StandardCharsets.UTF_8);
+			PaletteEntry currentEntry = null;
+
+			for (String line : lines)
+			{
+				String trimmed = line.trim();
+				if (trimmed.isEmpty()) continue;
+
+				if (line.startsWith("# "))
+				{
+					String meta = line.substring(2);
+					String[] parts = meta.split(";");
+					if (parts.length >= 3)
+					{
+						String name = parts[0];
+						Color color = new Color(Integer.parseInt(parts[1]), true);
+						boolean visible = Boolean.parseBoolean(parts[2]);
+						
+						palettePanel.addEntry(name, color);
+						currentEntry = palettePanel.getEntryPanels().get(palettePanel.getEntryPanels().size() - 1).getEntry();
+						currentEntry.setVisible(visible);
+					}
+				}
+				else if (line.endsWith(" IDS:") || line.endsWith(" IDS::"))
+				{
+				}
+				else if (line.startsWith("    ") && currentEntry != null)
+				{
+					try
+					{
+						currentEntry.getIds().add(Integer.parseInt(trimmed));
+					}
+					catch (NumberFormatException ignored) {}
+				}
+			}
+		}
+		catch (IOException e)
+		{
+			log.error("Could not load config from " + CONFIG_FILE_PATH, e);
+		}
 	}
 
 	@Override
@@ -92,30 +262,64 @@ public class StepSoundsMain extends Plugin implements KeyListener, MouseListener
 	@Override
 	public void keyPressed(KeyEvent e)
 	{
-		if (e.getKeyCode() == KeyEvent.VK_ALT)
-		{
-			altPressed = !altPressed;
-			if (config.showDebugMessages())
-			{
-				sendDebugMessage("Categorization mode: " + (altPressed ? "ENABLED" : "DISABLED"));
-			}
-		}
 	}
 
 	@Override
 	public void keyReleased(KeyEvent e)
 	{
+		if (e.getKeyCode() == KeyEvent.VK_ALT)
+		{
+			altPressed = !altPressed;
+		}
 	}
 
 	@Override
 	public MouseEvent mouseClicked(MouseEvent e)
 	{
-		if (altPressed && config.categorizationMode() && e.getButton() == MouseEvent.BUTTON1)
+		if (e.getButton() == MouseEvent.BUTTON2) // Middle Mouse Button
 		{
-			handleCategorizationClick(e);
-			e.consume();
+			Tile tile = client.getSelectedSceneTile();
+			if (tile != null && tile.getGroundObject() != null)
+			{
+				int id = tile.getGroundObject().getId();
+				
+				undoStack.push(serializeCurrentState());
+				if (undoStack.size() > 50) undoStack.remove(0);
+
+				if (palettePanel.isEraserMode())
+				{
+					removeFromAllCategories(id);
+					e.consume();
+				}
+				else if (palettePanel.getSelectedEntryPanel() != null)
+				{
+					removeFromAllCategories(id);
+					palettePanel.getSelectedEntryPanel().getEntry().getIds().add(id);
+					savePalette(false);
+					e.consume();
+				}
+				else
+				{
+					undoStack.pop();
+				}
+			}
 		}
 		return e;
+	}
+
+	private void removeFromAllCategories(int id)
+	{
+		for (PaletteEntryPanel panel : palettePanel.getEntryPanels())
+		{
+			panel.getEntry().getIds().remove(id);
+		}
+	}
+
+	public List<PaletteEntry> getPaletteEntries()
+	{
+		return palettePanel.getEntryPanels().stream()
+			.map(PaletteEntryPanel::getEntry)
+			.collect(Collectors.toList());
 	}
 
 	@Override
@@ -135,128 +339,6 @@ public class StepSoundsMain extends Plugin implements KeyListener, MouseListener
 
 	@Override
 	public MouseEvent mouseMoved(MouseEvent e) { return e; }
-
-	private void handleCategorizationClick(MouseEvent e)
-	{
-		Tile tile = client.getSelectedSceneTile();
-		if (tile == null) return;
-
-		GroundObject groundObject = tile.getGroundObject();
-		if (groundObject == null) return;
-
-		int id = groundObject.getId();
-		sendDebugMessage("Right-click Ground Object ID: " + id + " to categorize.");
-	}
-
-	@Subscribe
-	public void onMenuOpened(MenuOpened event)
-	{
-		if (!altPressed || !config.categorizationMode()) return;
-
-		Tile tile = client.getSelectedSceneTile();
-		if (tile == null || tile.getGroundObject() == null) return;
-
-		int id = tile.getGroundObject().getId();
-
-		for (GroundType type : GroundType.values())
-		{
-			if (type == GroundType.UNCATEGORIZED)
-			{
-				if (isCategorized(id))
-				{
-					client.createMenuEntry(-1)
-						.setOption(ColorUtil.prependColorTag("Uncategorize", type.getHighlightColor()))
-						.setTarget(id + "")
-						.setType(MenuAction.RUNELITE)
-						.onClick(e -> unCategorize(id));
-				}
-				continue;
-			}
-
-			client.createMenuEntry(-1)
-				.setOption(ColorUtil.prependColorTag("Categorize as " + type.name(), type.getHighlightColor()))
-				.setTarget(id + "")
-				.setType(MenuAction.RUNELITE)
-				.onClick(e -> categorize(id, type));
-		}
-	}
-
-	private void unCategorize(int id)
-	{
-		unCategorize(id, true);
-	}
-
-	private void unCategorize(int id, boolean notify)
-	{
-		removeFromCategory(id, "stoneIds", config.stoneIds());
-		removeFromCategory(id, "grassIds", config.grassIds());
-		removeFromCategory(id, "dirtIds", config.dirtIds());
-		removeFromCategory(id, "woodIds", config.woodIds());
-		removeFromCategory(id, "fabricIds", config.fabricIds());
-		if (notify)
-		{
-			sendDebugMessage("Uncategorized ID " + id);
-		}
-	}
-
-	private void removeFromCategory(int id, String key, String currentIds)
-	{
-		Set<Integer> ids = parseIds(currentIds);
-		if (ids.remove(id))
-		{
-			String newIds = ids.stream().map(String::valueOf).collect(Collectors.joining(","));
-			configManager.setConfiguration("stepsounds", key, newIds);
-		}
-	}
-
-	private void categorize(int id, GroundType type)
-	{
-		unCategorize(id, false);
-
-		String key = "";
-		String currentIds = "";
-		switch (type)
-		{
-			case STONE: key = "stoneIds"; currentIds = config.stoneIds(); break;
-			case GRASS: key = "grassIds"; currentIds = config.grassIds(); break;
-			case DIRT: key = "dirtIds"; currentIds = config.dirtIds(); break;
-			case WOOD: key = "woodIds"; currentIds = config.woodIds(); break;
-			case FABRIC: key = "fabricIds"; currentIds = config.fabricIds(); break;
-		}
-
-		if (key.isEmpty()) return;
-
-		Set<Integer> ids = parseIds(currentIds);
-		ids.add(id);
-		String newIds = ids.stream().map(String::valueOf).collect(Collectors.joining(","));
-		configManager.setConfiguration("stepsounds", key, newIds);
-		sendDebugMessage("Categorized ID " + id + " as " + type.name());
-	}
-
-	private boolean isCategorized(int id)
-	{
-		return getGroundType(id) != GroundType.UNCATEGORIZED;
-	}
-
-	public GroundType getGroundType(int id)
-	{
-		if (parseIds(config.stoneIds()).contains(id)) return GroundType.STONE;
-		if (parseIds(config.grassIds()).contains(id)) return GroundType.GRASS;
-		if (parseIds(config.dirtIds()).contains(id)) return GroundType.DIRT;
-		if (parseIds(config.woodIds()).contains(id)) return GroundType.WOOD;
-		if (parseIds(config.fabricIds()).contains(id)) return GroundType.FABRIC;
-		return GroundType.UNCATEGORIZED;
-	}
-
-	private Set<Integer> parseIds(String csv)
-	{
-		if (csv == null || csv.isEmpty()) return new HashSet<>();
-		return Arrays.stream(csv.split(","))
-			.map(String::trim)
-			.filter(s -> !s.isEmpty())
-			.map(Integer::parseInt)
-			.collect(Collectors.toSet());
-	}
 
 	@Subscribe
 	public void onGameTick(GameTick event)
@@ -308,14 +390,15 @@ public class StepSoundsMain extends Plugin implements KeyListener, MouseListener
 		lastPitch = pitch;
 
 		if (distance > 1)
+		//run
 		{
 			audioManager.playStepSoundDelayed(finalVolume, pitch, 50);
 			audioManager.playStepSoundDelayed(finalVolume, pitch, 350);
 		}
+		//walk
 		else
 		{
-			audioManager.playStepSoundDelayed(finalVolume * 0.9f, pitch * 0.95f, 100);
-			audioManager.playStepSoundDelayed(finalVolume, pitch, 400);
+			audioManager.playStepSoundDelayed(finalVolume, pitch, 500);
 		}
 	}
 

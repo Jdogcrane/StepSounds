@@ -1,5 +1,7 @@
 package com.JFroggy;
 
+import java.awt.Color;
+import net.runelite.client.config.Alpha;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -112,6 +114,19 @@ public interface StepSoundsConfig extends Config
 		position = 99
 	)
 	String debugSettings = "debugSettings";
+
+	@Alpha
+	@ConfigItem(
+		keyName = "uncategorizedColor",
+		name = "Uncategorized Color",
+		description = "Color for objects that haven't been categorized yet",
+		position = 0,
+		section = debugSettings
+	)
+	default Color uncategorizedColor()
+	{
+		return new Color(255, 0, 0, 150);
+	}
 
 	@ConfigItem(
 		keyName = "showDebugMessages",

@@ -1,5 +1,6 @@
 package com.JFroggy;
 
+import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Polygon;
@@ -32,7 +33,7 @@ public class GroundObjectOverlay extends Overlay
 	@Override
 	public Dimension render(Graphics2D graphics)
 	{
-		if (!config.categorizationMode() || !plugin.isAltPressed())
+		if (!config.categorizationMode())
 		{
 			return null;
 		}
@@ -65,9 +66,26 @@ public class GroundObjectOverlay extends Overlay
 
 		if (poly != null)
 		{
-			GroundType type = plugin.getGroundType(groundObject.getId());
-			graphics.setColor(type.getHighlightColor());
-			graphics.fillPolygon(poly);
+			boolean categorized = false;
+			for (PaletteEntry entry : plugin.getPaletteEntries())
+			{
+				if (entry.getIds().contains(groundObject.getId()))
+				{
+					if (entry.isVisible())
+					{
+						graphics.setColor(entry.getColor());
+						graphics.fillPolygon(poly);
+					}
+					categorized = true;
+					break;
+				}
+			}
+
+			if (!categorized && plugin.isAltPressed())
+			{
+				graphics.setColor(config.uncategorizedColor());
+				graphics.fillPolygon(poly);
+			}
 		}
 	}
 }
