@@ -57,56 +57,35 @@ public interface StepSoundsConfig extends Config
 	}
 
 	@ConfigSection(
-		name = "Categorization Data",
-		description = "Stored IDs for ground types",
-		position = 10
+		name = "Mapping Settings",
+		description = "Toggle mapping systems",
+		position = 2
 	)
-	String categorizationData = "categorizationData";
+	String mappingSettings = "mappingSettings";
 
 	@ConfigItem(
-		keyName = "stoneIds",
-		name = "Stone IDs",
-		description = "Comma separated list of stone IDs",
+		keyName = "groundObjectMapping",
+		name = "GroundObject Sound Mapping",
+		description = "Enable sound mapping based on GroundObjects",
 		position = 1,
-		section = categorizationData
+		section = mappingSettings
 	)
-	default String stoneIds() { return ""; }
+	default boolean groundObjectMapping()
+	{
+		return true;
+	}
 
 	@ConfigItem(
-		keyName = "grassIds",
-		name = "Grass IDs",
-		description = "Comma separated list of grass IDs",
+		keyName = "tileColorMapping",
+		name = "Tile RGB Sound Mapping",
+		description = "Enable sound mapping based on Tile RGB color",
 		position = 2,
-		section = categorizationData
+		section = mappingSettings
 	)
-	default String grassIds() { return ""; }
-
-	@ConfigItem(
-		keyName = "dirtIds",
-		name = "Dirt IDs",
-		description = "Comma separated list of dirt IDs",
-		position = 3,
-		section = categorizationData
-	)
-	default String dirtIds() { return ""; }
-
-	@ConfigItem(
-		keyName = "woodIds",
-		name = "Wood IDs",
-		description = "Comma separated list of wood IDs",
-		position = 4,
-		section = categorizationData
-	)
-	default String woodIds() { return ""; }
-
-	@ConfigItem(
-		keyName = "fabricIds",
-		name = "Fabric IDs",
-		description = "Comma separated list of fabric IDs",
-		position = 5,
-		section = categorizationData
-	)
-	default String fabricIds() { return ""; }
+	default boolean tileColorMapping()
+	{
+		return true;
+	}
 
 	@ConfigSection(
 		name = "Debug Settings",
